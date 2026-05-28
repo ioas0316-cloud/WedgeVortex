@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Spatiotemporal Coherence Engine</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #0a0a0a;
+            color: #00ffcc;
+            font-family: 'Courier New', Courier, monospace;
+            overflow: hidden; /* Prevent scrolling on touch */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+        canvas {
+            display: block;
+            touch-action: none; /* Let canvas handle touch entirely */
+        }
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            pointer-events: none;
+            background: rgba(0,0,0,0.5);
+            padding: 10px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="info">
+    <div>Status: <span id="ws-status">Connecting...</span></div>
+    <div>Master Phase ($\Omega$): <span id="master-phase">0.00</span></div>
+    <div style="font-size: 0.8em; margin-top: 10px; color: #aaa;">
+        * Drag a glowing node to induce a spatiotemporal distortion ($\Delta$).<br>
+        * Watch the system re-align to 120° coherence autonomously.
+    </div>
+</div>
+
+<canvas id="canvas"></canvas>
+
+<script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const statusEl = document.getElementById('ws-status');
+    const masterPhaseEl = document.getElementById('master-phase');
+
+    // --- Sizing ---
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // --- Physics Engine (Client Side) ---
+    // The exact same laws of physics as the server.
+    const ATTRACTION_K = 0.05;
+    const REPULSION_K = 0.1;
+    const REPULSION_DIST = Math.PI * (2/3); // 120 degrees
+    let MASTER_SPEED = 0.05;
+
+    let masterPhase = 0.0;
+    let localPhases = [0.0, 0.0, 0.0];
+    let serverPhases = [0.0, 0.0, 0.0]; // To show the server's state as a shadow
+
+    // Radius for rendering
+    const radius = Math.min(canvas.width, canvas.height) * 0.3;
+
+    function modulo(a, b) {
+        return ((a % b) + b) % b;
+    }
+
+    let lastTime = 0;
+    // Expected simulation tick rate to match the server speed (60 fps base)
+    const TARGET_FPS = 60;
+    const TARGET_FRAME_TIME = 1000 / TARGET_FPS;
+
+    function stepPhysics(dt) {
+        // Scale physics by delta-time to ensure consistency across refresh rates
+        let timeScale = dt / TARGET_FRAME_TIME;
+
+        masterPhase = modulo(masterPhase + MASTER_SPEED * timeScale, 2 * Math.PI);
+
+        let newPhases = [...localPhases];
+
+        for (let i = 0; i < 3; i++) {
+            // If dragging, suspend physics for this node
+            if (draggingNodeIndex === i) continue;
+
+            let repulsionForce = 0.0;
+            for (let j = 0; j < 3; j++) {
+                if (i === j) continue;
+
+                let diff = localPhases[i] - localPhases[j];
+                // Normalize to [-pi, pi] using a proper modulo function
+                diff = modulo(diff + Math.PI, 2 * Math.PI) - Math.PI;
+
+                if (Math.abs(diff) < REPULSION_DIST) {
+                    let direction = diff > 0 ? 1 : -1;
+                    let magnitude = (REPULSION_DIST - Math.abs(diff)) * REPULSION_K;
+                    repulsionForce += direction * magnitude;
+                }
+            }
+
+            newPhases[i] = modulo(localPhases[i] + (MASTER_SPEED + repulsionForce) * timeScale, 2 * Math.PI);
+        }
+
+        localPhases = newPhases;
+    }
+
+    // --- WebSocket Logic ---
+    // Connect to the same IP but port 8765
+    const ws = new WebSocket(`ws://${window.location.hostname}:8765`);
+
+    ws.onopen = () => {
+        statusEl.innerText = "Coherent (Sync Active)";
+        statusEl.style.color = "#00ffcc";
+    };
+
+    ws.onclose = () => {
+        statusEl.innerText = "Decohered (Disconnected)";
+        statusEl.style.color = "#ff3366";
+    };
+
+    ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+
+        if (data.type === "sync") {
+            // Sync the absolute time reference
+            masterPhase = data.master_phase;
+            masterPhaseEl.innerText = masterPhase.toFixed(2);
+
+            // We keep track of the server's phases to visualize them
+            serverPhases = data.server_phases;
+
+            // NOTE: We DO NOT overwrite localPhases with serverPhases.
+            // The magic is that both client and server run the SAME physics engine.
+            // They will naturally align.
+        } else if (data.type === "distortion") {
+            // A distortion arrived from another universe (or echoed back)
+            // Apply it locally if we aren't the ones currently dragging it
+            if (draggingNodeIndex !== data.rotor) {
+                 localPhases[data.rotor] = (localPhases[data.rotor] + data.delta) % (2 * Math.PI);
+                 if (localPhases[data.rotor] < 0) localPhases[data.rotor] += 2 * Math.PI;
+            }
+        }
+    };
+
+    // --- Interaction Logic ---
+    let draggingNodeIndex = -1;
+    let lastDragAngle = 0;
+
+    function getMouseAngle(x, y) {
+        const cx = canvas.width / 2;
+        const cy = canvas.height / 2;
+        return Math.atan2(y - cy, x - cx);
+    }
+
+    function handleStart(x, y) {
+        const cx = canvas.width / 2;
+        const cy = canvas.height / 2;
+
+        // Find if we clicked near a node
+        for (let i = 0; i < 3; i++) {
+            const nx = cx + Math.cos(localPhases[i]) * radius;
+            const ny = cy + Math.sin(localPhases[i]) * radius;
+
+            const dist = Math.hypot(x - nx, y - ny);
+            if (dist < 40) { // Hit radius
+                draggingNodeIndex = i;
+                lastDragAngle = getMouseAngle(x, y);
+                break;
+            }
+        }
+    }
+
+    function handleMove(x, y) {
+        if (draggingNodeIndex === -1) return;
+
+        const currentAngle = getMouseAngle(x, y);
+
+        // Calculate Delta (distortion)
+        let delta = currentAngle - lastDragAngle;
+
+        // Normalize delta to avoid huge jumps across the -pi/pi boundary
+        if (delta > Math.PI) delta -= 2 * Math.PI;
+        if (delta < -Math.PI) delta += 2 * Math.PI;
+
+        if (Math.abs(delta) > 0.001) {
+            // Apply distortion locally immediately
+            localPhases[draggingNodeIndex] = (localPhases[draggingNodeIndex] + delta) % (2 * Math.PI);
+            if (localPhases[draggingNodeIndex] < 0) localPhases[draggingNodeIndex] += 2 * Math.PI;
+
+            // Transmit ONLY the delta (spatiotemporal distortion) to the server
+            if (ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: "distortion",
+                    rotor: draggingNodeIndex,
+                    delta: delta
+                }));
+            }
+
+            lastDragAngle = currentAngle;
+        }
+    }
+
+    function handleEnd() {
+        draggingNodeIndex = -1;
+    }
+
+    // Mouse events
+    canvas.addEventListener('mousedown', (e) => handleStart(e.clientX, e.clientY));
+    window.addEventListener('mousemove', (e) => handleMove(e.clientX, e.clientY));
+    window.addEventListener('mouseup', handleEnd);
+
+    // Touch events
+    canvas.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        handleStart(e.touches[0].clientX, e.touches[0].clientY);
+    }, {passive: false});
+    canvas.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        handleMove(e.touches[0].clientX, e.touches[0].clientY);
+    }, {passive: false});
+    canvas.addEventListener('touchend', handleEnd);
+
+
+    // --- Render Loop ---
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        const cx = canvas.width / 2;
+        const cy = canvas.height / 2;
+
+        // Draw Master Rotor Orbit
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, 0, 2 * Math.PI);
+        ctx.strokeStyle = "rgba(0, 255, 204, 0.2)";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Draw Delta-Wye Neutral Point (Center)
+        ctx.beginPath();
+        ctx.arc(cx, cy, 5, 0, 2 * Math.PI);
+        ctx.fillStyle = "#00ffcc";
+        ctx.fill();
+
+        // Draw Server Phases as ghost shadows (to prove coherence)
+        for (let i = 0; i < 3; i++) {
+            const sx = cx + Math.cos(serverPhases[i]) * radius;
+            const sy = cy + Math.sin(serverPhases[i]) * radius;
+
+            ctx.beginPath();
+            ctx.arc(sx, sy, 10, 0, 2 * Math.PI);
+            ctx.fillStyle = "rgba(255, 51, 102, 0.3)"; // Redish ghost
+            ctx.fill();
+
+            // Line to center
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(sx, sy);
+            ctx.strokeStyle = "rgba(255, 51, 102, 0.1)";
+            ctx.stroke();
+        }
+
+        // Draw Local Phases (The active nodes)
+        for (let i = 0; i < 3; i++) {
+            const lx = cx + Math.cos(localPhases[i]) * radius;
+            const ly = cy + Math.sin(localPhases[i]) * radius;
+
+            ctx.beginPath();
+            ctx.arc(lx, ly, 15, 0, 2 * Math.PI);
+            ctx.fillStyle = i === draggingNodeIndex ? "#ffffff" : "#00ffcc";
+            ctx.fill();
+
+            // Wye-Connection Line (Node to Neutral Point)
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(lx, ly);
+            ctx.strokeStyle = "rgba(0, 255, 204, 0.5)";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Label
+            ctx.fillStyle = "#fff";
+            ctx.font = "14px Arial";
+            ctx.fillText(`R${i}`, lx + 20, ly + 20);
+        }
+
+        // Draw Delta-Connections (Lines between nodes forming a triangle)
+        ctx.beginPath();
+        ctx.moveTo(cx + Math.cos(localPhases[0]) * radius, cy + Math.sin(localPhases[0]) * radius);
+        ctx.lineTo(cx + Math.cos(localPhases[1]) * radius, cy + Math.sin(localPhases[1]) * radius);
+        ctx.lineTo(cx + Math.cos(localPhases[2]) * radius, cy + Math.sin(localPhases[2]) * radius);
+        ctx.closePath();
+        ctx.strokeStyle = "rgba(0, 255, 204, 0.2)";
+        ctx.stroke();
+    }
+
+    function loop(timestamp) {
+        if (!lastTime) lastTime = timestamp;
+        let dt = timestamp - lastTime;
+        // Limit dt to avoid massive jumps if the tab was inactive
+        if (dt > 100) dt = TARGET_FRAME_TIME;
+
+        stepPhysics(dt);
+        draw();
+
+        lastTime = timestamp;
+        requestAnimationFrame(loop);
+    }
+
+    // Start loop
+    requestAnimationFrame(loop);
+
+</script>
+</body>
+</html>
