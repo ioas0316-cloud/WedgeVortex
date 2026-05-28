@@ -9,3 +9,4 @@
 ## 5. 위상 통신 기어 (WedgeVortex)
 
 * [WedgeVortex 하이브리드 인척력 동기화 명세서 및 벤치마크 평가 기준](docs/4_communication_gear/WEDGE_VORTEX_ARCHITECTURE.md)
+* [WedgeVortex 아키텍처 벤치마크 평가 성적표](docs/4_communication_gear/BENCHMARK_REPORT.md)
