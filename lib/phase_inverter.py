@@ -19,7 +19,7 @@ try:
     vortex_lib.init_pinned_memory_pool.argtypes = [ctypes.c_double]
     vortex_lib.init_pinned_memory_pool.restype = None
     vortex_lib.execute_causality_vortex.argtypes = [
-        ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_uint32,
+        ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_uint32, ctypes.c_char_p,
         ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float)
     ]
     vortex_lib.execute_causality_vortex.restype = ctypes.c_int
@@ -39,13 +39,9 @@ class PhaseInverterGate:
         self.free_vram, _ = self.hw_bridge.get_realtime_vram_state()
         vortex_lib.init_pinned_memory_pool(float(self.free_vram))
 
-        # Function reference to avoid lookup overhead
         self._execute_causality_vortex = vortex_lib.execute_causality_vortex
 
     def process_hybrid_causality_vortex(self, packet_map_stream: Dict, noise_mask: int = 0, identity_filter: int = 0) -> bytes:
-        # Extreme optimized path to avoid dictionary and python overheads.
-        # In a real environment, this data would be parsed at the network layer and passed directly as ints.
-        # Here we extract and cast efficiently.
         current_bytes = packet_map_stream["payload"]
         raw_len = len(current_bytes)
 
@@ -58,6 +54,7 @@ class PhaseInverterGate:
             survival,
             missing,
             address_ptr,
+            current_bytes if not missing else None,
             self._past_momentum_ptr,
             self._future_gravity_ptr
         )
