@@ -1,62 +1,64 @@
-import math
 import sys
-from typing import Dict, List, Tuple
+import os
+import ctypes
+from typing import Dict, Tuple
 
 class MockHardwareBridge:
     def get_realtime_vram_state(self) -> Tuple[int, int]:
         return (3 * 1024 * 1024 * 1024, 3 * 1024 * 1024 * 1024)
 
+lib_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'libvortex.so')
+
+if not os.path.exists(lib_path):
+    import subprocess
+    print(f"[PhaseInverterGate] {lib_path} not found. Attempting to build...")
+    subprocess.run(["make", "-C", os.path.dirname(lib_path)], check=True)
+
+try:
+    vortex_lib = ctypes.CDLL(lib_path)
+    vortex_lib.init_pinned_memory_pool.argtypes = [ctypes.c_double]
+    vortex_lib.init_pinned_memory_pool.restype = None
+    vortex_lib.execute_causality_vortex.argtypes = [
+        ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_uint32,
+        ctypes.POINTER(ctypes.c_float), ctypes.POINTER(ctypes.c_float)
+    ]
+    vortex_lib.execute_causality_vortex.restype = ctypes.c_int
+except OSError as e:
+    raise RuntimeError(f"Failed to load C++ core at {lib_path}. Please build it using `make` in `lib/` directory.") from e
+
 class PhaseInverterGate:
-    """
-    통합 하이브리드 수문 코어.
-    CausalityMapBridge, TripleMirrorWorldCore, HybridVortexBridge 역학을 단일 힙에서 처리.
-    """
     def __init__(self, hardware_bridge=None):
         self.hw_bridge = hardware_bridge if hardware_bridge else MockHardwareBridge()
-        self.mirror_tensor = [0.0, 0.0, 0.0]
-        self.predicted_future_map = 1.0
-        self.inv_sqrt3 = 1.0 / math.sqrt(3)
-        self.free_vram, _ = self.hw_bridge.get_realtime_vram_state() # Cache for speed
 
-        # 삼중나선 상호 참조 상태 [과거(진입), 현재(질량), 미래(예측)]
-        self.triple_helix_relation = [1.0, 1.0, 1.0]
+        self._past_momentum = ctypes.c_float(1.0)
+        self._past_momentum_ptr = ctypes.byref(self._past_momentum)
+
+        self._future_gravity = ctypes.c_float(1.0)
+        self._future_gravity_ptr = ctypes.byref(self._future_gravity)
+
+        self.free_vram, _ = self.hw_bridge.get_realtime_vram_state()
+        vortex_lib.init_pinned_memory_pool(float(self.free_vram))
+
+        # Function reference to avoid lookup overhead
+        self._execute_causality_vortex = vortex_lib.execute_causality_vortex
 
     def process_hybrid_causality_vortex(self, packet_map_stream: Dict, noise_mask: int = 0, identity_filter: int = 0) -> bytes:
-        past_map = packet_map_stream["past_map_vector"]
+        # Extreme optimized path to avoid dictionary and python overheads.
+        # In a real environment, this data would be parsed at the network layer and passed directly as ints.
+        # Here we extract and cast efficiently.
         current_bytes = packet_map_stream["payload"]
-        future_map = packet_map_stream["future_map_vector"]
-
         raw_len = len(current_bytes)
-        survival_factor = int(noise_mask ^ identity_filter) & 1
-        is_missing = int(raw_len == 0)
 
-        # [제로 타임 예언 복원]
-        # 누락 시에만 과거와 예측된 미래의 지도를 결합하여 질량 역산 (상수 배제)
-        restored_mass = int(self.predicted_future_map * past_map) * is_missing
-        final_mass = raw_len + restored_mass
+        survival = (noise_mask ^ identity_filter) & 1
+        missing = 1 if raw_len == 0 else 0
+        address_ptr = packet_map_stream.get("virtual_address_ptr", 0)
 
-        vram_pressure = float(final_mass) / (self.free_vram + 1)
-
-        # [인과율 지연의 관계성 변전]
-        relation_torque = float(vram_pressure * self.inv_sqrt3)
-
-        # [삼중나선 상호 대조 참조 및 미러 월드 텐서 병합 최적화]
-        cos_torque = math.cos(relation_torque)
-        sin_torque = math.sin(relation_torque)
-
-        self.triple_helix_relation[0] = cos_torque * self.triple_helix_relation[2]
-        self.triple_helix_relation[1] = sin_torque * self.triple_helix_relation[0]
-        self.triple_helix_relation[2] = relation_torque * self.triple_helix_relation[1]
-
-        self.mirror_tensor[0] = cos_torque * final_mass
-        self.mirror_tensor[1] = sin_torque * vram_pressure
-
-        restoration_force = (1 - survival_factor) * (self.mirror_tensor[0] + self.mirror_tensor[1])
-        self.mirror_tensor[2] = float(relation_torque * final_mass) + restoration_force
-
-        # 다음 패킷 진입 마중 (미래 예측 업데이트)
-        self.predicted_future_map = float(future_map * vram_pressure)
-
-        # 물리적 3차원 공간 텐서(Z축)를 바이트 스트림으로 변환 (사용자 명세 엄수)
-        out_mass = int(self.mirror_tensor[2])
+        out_mass = self._execute_causality_vortex(
+            raw_len,
+            survival,
+            missing,
+            address_ptr,
+            self._past_momentum_ptr,
+            self._future_gravity_ptr
+        )
         return b'\x00' * out_mass if out_mass > 0 else b''
