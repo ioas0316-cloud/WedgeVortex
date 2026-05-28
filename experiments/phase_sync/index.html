@@ -103,6 +103,24 @@
     const sendBtn = document.getElementById('send-btn');
     const msgLog = document.getElementById('received-messages');
     const diceBtn = document.getElementById('dice-btn');
+    const viewToggleBtn = document.createElement('button');
+    viewToggleBtn.innerText = "🌌 Switch to Galaxy Map";
+    viewToggleBtn.style.cssText = "padding: 5px; background: #222; color: #00ffcc; border: 1px solid #00ffcc; cursor: pointer; font-weight: bold; margin-top: 5px;";
+    msgInput.parentElement.appendChild(viewToggleBtn);
+
+    // --- Galaxy Map (Macro Universe) State ---
+    let isGalaxyView = false;
+    let universeState = {}; // channel_phase -> node_count
+
+    viewToggleBtn.addEventListener('click', () => {
+        isGalaxyView = !isGalaxyView;
+        viewToggleBtn.innerText = isGalaxyView ? "🔭 Switch to Local Star System" : "🌌 Switch to Galaxy Map";
+        if (isGalaxyView) {
+            msgLog.innerHTML = `<div style="color: #aaa;">Viewing macro-universe. Local spatial gossip suspended.</div>`;
+        } else {
+            msgLog.innerHTML = `<div style="color: #555;">Returned to local star system...</div>`;
+        }
+    });
 
     // UI Elements for Absolute Tuner
     const cmdContainer = document.getElementById('absolute-cmd-container');
@@ -404,6 +422,41 @@
 
     ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
+
+        // Macro Universe Tracking
+        if (data.type === "universe_pulse") {
+            universeState = data.galaxies;
+
+            // Orbital Mechanics (Macro Phase Logic)
+            // If we are NOT the Absolute Tuner, our channel's frequency is slowly pulled
+            // by the gravity of the largest massive star (channel) nearby.
+            if (!iAmAbsolute && !isChannelLocked) {
+                let maxMass = 0;
+                let targetPullPhase = currentChannelPhase;
+
+                for (let chStr in universeState) {
+                    let chPhase = parseFloat(chStr);
+                    let mass = universeState[chStr];
+
+                    if (mass > maxMass) {
+                        // Only feel gravity from adjacent universes (within PI/4 rads) to form "Alliances"
+                        let diff = modulo(chPhase - currentChannelPhase + Math.PI, 2 * Math.PI) - Math.PI;
+                        if (Math.abs(diff) < Math.PI / 4 && mass > 1) { // Ignore solo wanderers
+                            maxMass = mass;
+                            targetPullPhase = chPhase;
+                        }
+                    }
+                }
+
+                // Slowly drift towards the massive alliance
+                if (targetPullPhase !== currentChannelPhase) {
+                    let diff = modulo(targetPullPhase - currentChannelPhase + Math.PI, 2 * Math.PI) - Math.PI;
+                    currentChannelPhase = modulo(currentChannelPhase + (diff * 0.05), 2 * Math.PI); // 5% drift per pulse
+                    freqDisplay.innerText = currentChannelPhase.toFixed(4) + " (Drifting)";
+                }
+            }
+            return;
+        }
 
         // The Global Big Bang overrides all filters
         if (data.type === "global_big_bang") {
@@ -757,6 +810,58 @@
                 ctx.textAlign = "center";
                 ctx.fillText(globalCommandText, cx, cy);
                 ctx.textAlign = "left"; // reset
+            }
+        }
+
+        // --- Galaxy Map Override ---
+        if (isGalaxyView) {
+            // Overdraw the screen for deep space
+            ctx.fillStyle = "rgba(0, 0, 0, 0.9)";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Galaxy Grid
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius, 0, 2 * Math.PI);
+            ctx.strokeStyle = "rgba(0, 255, 204, 0.05)";
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            // Render Channels as Stars
+            for (let chStr in universeState) {
+                let chPhase = parseFloat(chStr);
+                let mass = universeState[chStr];
+
+                let sx = cx + Math.cos(chPhase) * radius;
+                let sy = cy + Math.sin(chPhase) * radius;
+
+                // Star size based on mass
+                let starRadius = 5 + (mass * 2);
+
+                // Glow
+                let gradient = ctx.createRadialGradient(sx, sy, 0, sx, sy, starRadius * 2);
+                gradient.addColorStop(0, "rgba(255, 255, 255, 1)");
+                gradient.addColorStop(0.2, "rgba(0, 255, 204, 0.8)");
+                gradient.addColorStop(1, "rgba(0, 255, 204, 0)");
+
+                ctx.beginPath();
+                ctx.arc(sx, sy, starRadius * 2, 0, 2 * Math.PI);
+                ctx.fillStyle = gradient;
+                ctx.fill();
+
+                // If it's my channel, highlight it
+                if (Math.abs(chPhase - currentChannelPhase) < 0.001) {
+                    ctx.beginPath();
+                    ctx.arc(sx, sy, starRadius * 2.5, 0, 2 * Math.PI);
+                    ctx.strokeStyle = "#ff3366";
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([5, 5]);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+
+                    ctx.fillStyle = "#ff3366";
+                    ctx.font = "12px Courier";
+                    ctx.fillText("You are here", sx + 15, sy - 15);
+                }
             }
         }
 
