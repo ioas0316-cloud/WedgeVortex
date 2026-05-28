@@ -1,7 +1,7 @@
 CC = g++
 CFLAGS = -O3 -shared -fPIC
 TARGET = libvortex.so
-SRC = vortex_core.cpp
+SRC = ../src/phase_kernel.cpp
 
 all: $(TARGET)
 
