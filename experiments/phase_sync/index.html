@@ -69,6 +69,12 @@
         <button id="send-btn" style="padding: 5px; background: #00ffcc; color: #000; border: none; cursor: pointer; font-weight: bold;">Radiate Data</button>
     </div>
 
+    <div id="absolute-cmd-container" style="display: none; margin-top: 10px; border: 2px solid #ff00ff; padding: 10px; background: rgba(255,0,255,0.1);">
+        <div style="color: #ff00ff; font-weight: bold; font-size: 0.9em; margin-bottom: 5px;">👑 ABSOLUTE COMMAND AUTHORITY</div>
+        <input type="text" id="cmd-input" placeholder="Impose your will on the universe..." style="padding: 5px; background: #000; color: #ff00ff; border: 1px solid #ff00ff; width: 100%; box-sizing: border-box;">
+        <button id="cmd-btn" style="margin-top: 5px; width: 100%; padding: 5px; background: #ff00ff; color: #fff; border: none; cursor: pointer; font-weight: bold;">Execute Global Pulse</button>
+    </div>
+
     <div id="received-messages" style="margin-top: 15px; max-height: 150px; overflow-y: auto; font-size: 0.9em; border-top: 1px dashed #00ffcc; padding-top: 5px;">
         <div style="color: #555;">Resonant echoes will appear here...</div>
     </div>
@@ -97,6 +103,11 @@
     const sendBtn = document.getElementById('send-btn');
     const msgLog = document.getElementById('received-messages');
     const diceBtn = document.getElementById('dice-btn');
+
+    // UI Elements for Absolute Tuner
+    const cmdContainer = document.getElementById('absolute-cmd-container');
+    const cmdInput = document.getElementById('cmd-input');
+    const cmdBtn = document.getElementById('cmd-btn');
 
     // --- Phase Multiverse (Channel) Logic ---
     let currentChannelPhase = 0.0;
@@ -268,6 +279,19 @@
     // --- Absolute Tuner Protocol Variables ---
     let isChannelLocked = false;
     let lockedUntil = 0;
+    let iAmAbsolute = false;
+
+    // --- Safe Text Node Helper to prevent XSS ---
+    function createSafeSpan(text, color, isBold=false, bgColor="transparent", padding="0px", display="inline") {
+        const span = document.createElement('span');
+        span.textContent = text;
+        span.style.color = color;
+        if (isBold) span.style.fontWeight = "bold";
+        span.style.background = bgColor;
+        span.style.padding = padding;
+        span.style.display = display;
+        return span;
+    }
 
     // --- Resonance Reception (Data Unpacking & Dice Physics) ---
     function handlePulse(senderId, rollValue, senderPersona) {
@@ -275,10 +299,13 @@
         // Increase base speed temporarily to simulate a massive tension shockwave
         myAxisSpeed += (rollValue * 0.05);
 
-        // Log it
+        // Log it Safely
         const msgDiv = document.createElement('div');
         msgDiv.style.marginBottom = "5px";
-        msgDiv.innerHTML = `<span style="color: ${senderPersona.color}">[${senderPersona.name}]</span> rolled a <b>${rollValue}</b> 🎲 (Phase Shockwave!)`;
+        msgDiv.appendChild(createSafeSpan(`[${senderPersona.name}]`, senderPersona.color));
+        msgDiv.appendChild(document.createTextNode(" rolled a "));
+        msgDiv.appendChild(createSafeSpan(`${rollValue}`, "#fff", true));
+        msgDiv.appendChild(document.createTextNode(" 🎲 (Phase Shockwave!)"));
 
         if (msgLog.children.length > 0 && msgLog.children[0].innerText.includes("Resonant echoes")) {
             msgLog.innerHTML = "";
@@ -290,21 +317,41 @@
             phase: peerPhases[senderId] || myPhase,
             radius: 15,
             maxRadius: 100 + (rollValue * 20),
+            // Ensure color is a valid hex to prevent strange canvas injection errors though canvas handles it gracefully
             color: senderPersona.color,
             alpha: 1.0
         });
     }
 
+    let absoluteFlashColor = "#ffffff";
+    let globalCommandText = "";
+
     function triggerGlobalBigBang(senderPersona, newBasePhase) {
         // The Absolute Tuner Protocol (1-Hour Lock-down)
         const msgDiv = document.createElement('div');
         msgDiv.style.marginBottom = "5px";
-        msgDiv.innerHTML = `<span style="color: #fff; background: #ff00ff; padding: 5px; display: block; font-weight: bold; margin-top: 10px;">🌌 GLOBAL BIG BANG!<br>지금 ${senderPersona.name}이(가) 주사위의 잔영을 통해 이 우주의 주파수를 조율 중입니다!</span>`;
+
+        const bbSpan = createSafeSpan(
+            `🌌 GLOBAL BIG BANG!\n지금 ${senderPersona.name}이(가) 주사위의 잔영을 통해 이 우주의 주파수를 조율 중입니다!`,
+            "#fff", true, senderPersona.color, "5px", "block"
+        );
+        bbSpan.style.marginTop = "10px";
+        msgDiv.appendChild(bbSpan);
+
         msgLog.prepend(msgDiv);
 
         // 1-Hour Lock
         isChannelLocked = true;
         lockedUntil = Date.now() + (60 * 60 * 1000);
+
+        // Check if I am the absolute
+        if (senderPersona.name === myNickname && senderPersona.color === myAvatarColor) {
+            iAmAbsolute = true;
+            cmdContainer.style.display = "block";
+        } else {
+            iAmAbsolute = false;
+            cmdContainer.style.display = "none";
+        }
 
         // Force everyone to tune to the winner's frequency
         currentChannelPhase = newBasePhase;
@@ -315,6 +362,7 @@
 
         // Visual flash
         window.bigBangFlash = 1.0;
+        absoluteFlashColor = senderPersona.color;
 
         // Clear old peers that don't belong in this new forced reality
         peerPhases = {};
@@ -360,6 +408,35 @@
         // The Global Big Bang overrides all filters
         if (data.type === "global_big_bang") {
             triggerGlobalBigBang(data.persona, data.new_channel);
+            return;
+        } else if (data.type === "global_command") {
+            // Absolute Tuner Global Pulse Message
+            absoluteFlashColor = data.persona.color;
+            window.bigBangFlash = 0.8;
+            globalCommandText = data.message;
+            myAxisSpeed += 1.5; // Tempo surge
+
+            const msgDiv = document.createElement('div');
+            msgDiv.style.marginBottom = "5px";
+
+            msgDiv.appendChild(createSafeSpan(`[ABSOLUTE COMMAND] ${data.persona.name}:`, "#fff", true, data.persona.color, "3px"));
+            msgDiv.appendChild(document.createTextNode(" "));
+
+            const msgSpan = createSafeSpan(data.message, data.persona.color, true);
+            msgSpan.style.fontSize = "1.1em";
+            msgDiv.appendChild(msgSpan);
+
+            msgLog.prepend(msgDiv);
+
+            // Add a massive central ripple
+            ripples.push({
+                phase: currentChannelPhase,
+                radius: 10,
+                maxRadius: canvas.width * 0.8,
+                color: data.persona.color,
+                alpha: 1.0,
+                isGlobal: true
+            });
             return;
         }
 
@@ -462,6 +539,9 @@
     setInterval(() => {
         if (isChannelLocked && Date.now() > lockedUntil) {
             isChannelLocked = false;
+            iAmAbsolute = false;
+            cmdContainer.style.display = "none";
+
             channelInput.disabled = false;
             tuneBtn.disabled = false;
             channelInput.value = "Global";
@@ -473,6 +553,29 @@
             msgLog.prepend(msgDiv);
         }
     }, 10000);
+
+    // --- Absolute Tuner Execution ---
+    cmdBtn.addEventListener('click', () => {
+        if (!iAmAbsolute) return;
+        const text = cmdInput.value.trim();
+        if (!text) return;
+
+        if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+                type: "global_command",
+                message: text,
+                persona: {
+                    name: myNickname,
+                    color: myAvatarColor
+                }
+            }));
+            cmdInput.value = "";
+        }
+    });
+
+    cmdInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') cmdBtn.click();
+    });
 
     // --- Dice Pulse (Physical Rhythm) ---
     diceBtn.addEventListener('click', () => {
@@ -616,7 +719,7 @@
         // Draw Synesthetic Ripples (Afterimages)
         for (let i = ripples.length - 1; i >= 0; i--) {
             const r = ripples[i];
-            r.radius += dt * 0.1;
+            r.radius += r.isGlobal ? dt * 0.3 : dt * 0.1;
             r.alpha -= dt * 0.001;
 
             if (r.alpha <= 0) {
@@ -624,23 +727,37 @@
                 continue;
             }
 
-            const rx = cx + Math.cos(r.phase) * radius;
-            const ry = cy + Math.sin(r.phase) * radius;
+            // Global ripples emanate from center
+            const rx = r.isGlobal ? cx : cx + Math.cos(r.phase) * radius;
+            const ry = r.isGlobal ? cy : cy + Math.sin(r.phase) * radius;
 
             ctx.beginPath();
             ctx.arc(rx, ry, r.radius, 0, 2 * Math.PI);
             ctx.strokeStyle = r.color;
             ctx.globalAlpha = r.alpha;
-            ctx.lineWidth = 2;
+            ctx.lineWidth = r.isGlobal ? 5 : 2;
             ctx.stroke();
             ctx.globalAlpha = 1.0;
         }
 
-        // Draw Global Big Bang Flash
+        // Draw Global Big Bang Flash & Permanent Afterimage
         if (window.bigBangFlash && window.bigBangFlash > 0) {
-            ctx.fillStyle = `rgba(255, 255, 255, ${window.bigBangFlash})`;
+            // Convert hex to rgb to apply alpha
+            let hex = absoluteFlashColor.replace('#', '');
+            let r_col = parseInt(hex.substring(0,2), 16);
+            let g_col = parseInt(hex.substring(2,4), 16);
+            let b_col = parseInt(hex.substring(4,6), 16);
+            ctx.fillStyle = `rgba(${r_col}, ${g_col}, ${b_col}, ${window.bigBangFlash})`;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             window.bigBangFlash -= dt * 0.001;
+
+            if (globalCommandText && window.bigBangFlash > 0.2) {
+                ctx.fillStyle = "#fff";
+                ctx.font = "bold 30px Courier";
+                ctx.textAlign = "center";
+                ctx.fillText(globalCommandText, cx, cy);
+                ctx.textAlign = "left"; // reset
+            }
         }
 
         requestAnimationFrame(draw);
