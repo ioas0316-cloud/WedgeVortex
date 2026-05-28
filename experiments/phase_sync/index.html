@@ -39,9 +39,17 @@
 <body>
 
 <div id="info">
-    <div>Node Identity: <span id="node-id" class="self-id">Booting...</span></div>
+    <div style="margin-bottom: 10px; border-bottom: 1px dashed #00ffcc; padding-bottom: 10px;">
+        <div style="font-size: 0.9em; margin-bottom: 5px;">Persona (Avatar Setup):</div>
+        <div style="display: flex; gap: 5px; align-items: center;">
+            <input type="text" id="nickname-input" placeholder="Nickname..." value="Wanderer" style="padding: 5px; background: #111; color: #fff; border: 1px solid #fff; width: 80px;">
+            <input type="color" id="avatar-color" value="#ff3366" style="padding: 0; border: none; background: none; cursor: pointer; width: 30px; height: 30px;">
+        </div>
+    </div>
+
+    <div>Node ID: <span id="node-id" class="self-id">Booting...</span></div>
     <div>Local Phase: <span id="local-phase">0.00</span></div>
-    <div style="margin-top: 10px;">Channel Gravity (N): <span id="mass" class="highlight">1</span> Nodes</div>
+    <div style="margin-top: 5px;">Channel Gravity (N): <span id="mass" class="highlight">1</span> Nodes</div>
 
     <div style="margin-top: 15px; border-bottom: 1px dashed #00ffcc; padding-bottom: 10px;">
         <div style="font-size: 0.9em; margin-bottom: 5px;">Phase Multiverse Tuning:</div>
@@ -52,7 +60,11 @@
         <div style="font-size: 0.8em; margin-top: 5px; color: #aaa;">Current Frequency: <span id="freq-display" style="color: #fff;">...</span> rad</div>
     </div>
 
-    <div style="margin-top: 15px; display: flex; flex-direction: column; gap: 5px;">
+    <div style="margin-top: 15px; border-bottom: 1px dashed #00ffcc; padding-bottom: 10px;">
+        <button id="dice-btn" style="padding: 10px; width: 100%; background: #ffcc00; color: #000; border: none; cursor: pointer; font-weight: bold; font-size: 1.1em; border-radius: 5px;">🎲 Roll Dice (Phase Pulse)</button>
+    </div>
+
+    <div style="margin-top: 10px; display: flex; flex-direction: column; gap: 5px;">
         <input type="text" id="message-input" placeholder="Radiate to channel..." style="padding: 5px; background: #111; color: #00ffcc; border: 1px solid #00ffcc;">
         <button id="send-btn" style="padding: 5px; background: #00ffcc; color: #000; border: none; cursor: pointer; font-weight: bold;">Radiate Data</button>
     </div>
@@ -71,6 +83,10 @@
     const localPhaseEl = document.getElementById('local-phase');
     const massEl = document.getElementById('mass');
 
+    // UI Elements for Persona
+    const nicknameInput = document.getElementById('nickname-input');
+    const avatarColorInput = document.getElementById('avatar-color');
+
     // UI Elements for Channel Tuning
     const channelInput = document.getElementById('channel-input');
     const tuneBtn = document.getElementById('tune-btn');
@@ -80,6 +96,7 @@
     const msgInput = document.getElementById('message-input');
     const sendBtn = document.getElementById('send-btn');
     const msgLog = document.getElementById('received-messages');
+    const diceBtn = document.getElementById('dice-btn');
 
     // --- Phase Multiverse (Channel) Logic ---
     let currentChannelPhase = 0.0;
@@ -126,8 +143,14 @@
     resize();
 
     // Generate a unique ID for this local node
-    const myNodeId = "Node_" + Math.random().toString(36).substr(2, 6).toUpperCase();
+    const myNodeId = "N_" + Math.random().toString(36).substr(2, 4).toUpperCase();
     nodeIdEl.innerText = myNodeId;
+
+    let myNickname = nicknameInput.value;
+    let myAvatarColor = avatarColorInput.value;
+
+    nicknameInput.addEventListener('change', () => { myNickname = nicknameInput.value; });
+    avatarColorInput.addEventListener('change', () => { myAvatarColor = avatarColorInput.value; });
 
     // --- Turing Translation Layer (Hardware-Data Alignment) ---
     // Converts a string into an array of float Phase Angles (Theta)
@@ -162,6 +185,7 @@
 
     // The states of peers we hear via gossip
     let peerPhases = {};
+    let peerMetadatas = {}; // Stores nickname and color
     // We track timestamps to purge dead peers if they stop broadcasting
     let peerTimeouts = {};
 
@@ -241,7 +265,63 @@
         }
     };
 
-    // --- Resonance Reception (Data Unpacking) ---
+    // --- Absolute Tuner Protocol Variables ---
+    let isChannelLocked = false;
+    let lockedUntil = 0;
+
+    // --- Resonance Reception (Data Unpacking & Dice Physics) ---
+    function handlePulse(senderId, rollValue, senderPersona) {
+        // Physical visual response
+        // Increase base speed temporarily to simulate a massive tension shockwave
+        myAxisSpeed += (rollValue * 0.05);
+
+        // Log it
+        const msgDiv = document.createElement('div');
+        msgDiv.style.marginBottom = "5px";
+        msgDiv.innerHTML = `<span style="color: ${senderPersona.color}">[${senderPersona.name}]</span> rolled a <b>${rollValue}</b> 🎲 (Phase Shockwave!)`;
+
+        if (msgLog.children.length > 0 && msgLog.children[0].innerText.includes("Resonant echoes")) {
+            msgLog.innerHTML = "";
+        }
+        msgLog.prepend(msgDiv);
+
+        // Visual ripple effect registration (to be drawn in render loop)
+        ripples.push({
+            phase: peerPhases[senderId] || myPhase,
+            radius: 15,
+            maxRadius: 100 + (rollValue * 20),
+            color: senderPersona.color,
+            alpha: 1.0
+        });
+    }
+
+    function triggerGlobalBigBang(senderPersona, newBasePhase) {
+        // The Absolute Tuner Protocol (1-Hour Lock-down)
+        const msgDiv = document.createElement('div');
+        msgDiv.style.marginBottom = "5px";
+        msgDiv.innerHTML = `<span style="color: #fff; background: #ff00ff; padding: 5px; display: block; font-weight: bold; margin-top: 10px;">🌌 GLOBAL BIG BANG!<br>지금 ${senderPersona.name}이(가) 주사위의 잔영을 통해 이 우주의 주파수를 조율 중입니다!</span>`;
+        msgLog.prepend(msgDiv);
+
+        // 1-Hour Lock
+        isChannelLocked = true;
+        lockedUntil = Date.now() + (60 * 60 * 1000);
+
+        // Force everyone to tune to the winner's frequency
+        currentChannelPhase = newBasePhase;
+        channelInput.value = "[LOCKED] by " + senderPersona.name;
+        channelInput.disabled = true;
+        tuneBtn.disabled = true;
+        freqDisplay.innerText = currentChannelPhase.toFixed(4) + " (ABSOLUTE)";
+
+        // Visual flash
+        window.bigBangFlash = 1.0;
+
+        // Clear old peers that don't belong in this new forced reality
+        peerPhases = {};
+        for(let id in peerTimeouts) clearTimeout(peerTimeouts[id]);
+        peerTimeouts = {};
+    }
+
     function handleHolographicBurst(senderId, phaseBurst) {
         try {
             // Reconstruct the original data from the phase angles
@@ -277,6 +357,12 @@
     ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
 
+        // The Global Big Bang overrides all filters
+        if (data.type === "global_big_bang") {
+            triggerGlobalBigBang(data.persona, data.new_channel);
+            return;
+        }
+
         // Resonance Filter (Centrifugal Security)
         if (data.channel !== undefined && Math.abs(data.channel - currentChannelPhase) > 0.001) {
             return; // Ignore signals from parallel universes
@@ -285,6 +371,9 @@
         if (data.type === "gossip") {
             // A peer broadcasted their spatial state
             peerPhases[data.id] = data.phase;
+            if (data.persona) {
+                peerMetadatas[data.id] = data.persona;
+            }
 
             // Reset timeout for this peer
             if (peerTimeouts[data.id]) clearTimeout(peerTimeouts[data.id]);
@@ -292,6 +381,7 @@
             // If we don't hear from a peer in 2 seconds, assume it died and purge it
             peerTimeouts[data.id] = setTimeout(() => {
                 delete peerPhases[data.id];
+                delete peerMetadatas[data.id];
                 delete peerTimeouts[data.id];
             }, 2000);
 
@@ -300,6 +390,8 @@
         } else if (data.type === "holographic_burst") {
             // A peer transmitted a file/message as phase angles!
             handleHolographicBurst(data.id, data.phases);
+        } else if (data.type === "dice_pulse") {
+            handlePulse(data.id, data.roll, data.persona);
         }
     };
 
@@ -310,7 +402,11 @@
                 type: "gossip",
                 id: myNodeId,
                 phase: myPhase,
-                channel: currentChannelPhase
+                channel: currentChannelPhase,
+                persona: {
+                    name: myNickname,
+                    color: myAvatarColor
+                }
             }));
         }
     }, 50); // Broadcast state every 50ms (20Hz)
@@ -362,6 +458,80 @@
         if (e.key === 'Enter') sendBtn.click();
     });
 
+    // Check if Absolute Lock has expired
+    setInterval(() => {
+        if (isChannelLocked && Date.now() > lockedUntil) {
+            isChannelLocked = false;
+            channelInput.disabled = false;
+            tuneBtn.disabled = false;
+            channelInput.value = "Global";
+            tuneBtn.click();
+
+            const msgDiv = document.createElement('div');
+            msgDiv.style.marginBottom = "5px";
+            msgDiv.innerHTML = `<span style="color: #aaa;">[SYSTEM] The Absolute Lock has dissipated. Spacetime returns to normal.</span>`;
+            msgLog.prepend(msgDiv);
+        }
+    }, 10000);
+
+    // --- Dice Pulse (Physical Rhythm) ---
+    diceBtn.addEventListener('click', () => {
+        // Roll 6 dice simultaneously
+        let sum = 0;
+        let isAllSixes = true;
+
+        for(let i=0; i<6; i++) {
+            let roll = Math.floor(Math.random() * 6) + 1;
+            sum += roll;
+            if (roll !== 6) isAllSixes = false;
+        }
+
+        // For testing/demonstration purposes, we'll give a 1 in 10 chance of hitting it
+        // since true 1/46656 is too rare for a prototype evaluation.
+        // Uncomment the next line to use true probability:
+        // const hitBigBang = isAllSixes;
+        const hitBigBang = Math.random() < 0.1;
+
+        // Radiate pulse
+        if (ws.readyState === WebSocket.OPEN) {
+            if (hitBigBang) {
+                // The Absolute Tuner Bypass
+                // Winner establishes a new Absolute Base Phase based on their identity
+                const absolutePhase = stringToPhaseFrequency("ABSOLUTE_" + myNodeId + Date.now());
+
+                ws.send(JSON.stringify({
+                    type: "global_big_bang",
+                    id: myNodeId,
+                    new_channel: absolutePhase,
+                    persona: {
+                        name: myNickname,
+                        color: myAvatarColor
+                    }
+                }));
+
+                triggerGlobalBigBang({name: "ME", color: myAvatarColor}, absolutePhase);
+            } else {
+                ws.send(JSON.stringify({
+                    type: "dice_pulse",
+                    id: myNodeId,
+                    roll: sum,
+                    channel: currentChannelPhase,
+                    persona: {
+                        name: myNickname,
+                        color: myAvatarColor
+                    }
+                }));
+                // Apply locally
+                handlePulse(myNodeId, sum, {name: "ME", color: myAvatarColor});
+            }
+        } else {
+             // Apply locally if offline
+             handlePulse(myNodeId, sum, {name: "ME", color: myAvatarColor});
+        }
+    });
+
+    let ripples = [];
+
 
     // --- Render Loop ---
     let lastTime = 0;
@@ -395,11 +565,12 @@
         ctx.fill();
 
         // Combine all phases to draw the full topology
-        // We know our phase perfectly. We know peer phases delayed by gossip transit time.
-        // This naturally creates the concept of relativity in the UI.
         const allNodes = [
-            { id: myNodeId, phase: myPhase, isSelf: true },
-            ...peerIds.map(id => ({ id: id, phase: peerPhases[id], isSelf: false }))
+            { id: myNodeId, phase: myPhase, isSelf: true, name: myNickname, color: myAvatarColor },
+            ...peerIds.map(id => {
+                const meta = peerMetadatas[id] || { name: id, color: "#00ffcc" };
+                return { id: id, phase: peerPhases[id], isSelf: false, name: meta.name, color: meta.color };
+            })
         ];
 
         for (let i = 0; i < allNodes.length; i++) {
@@ -411,15 +582,21 @@
             ctx.beginPath();
             ctx.moveTo(cx, cy);
             ctx.lineTo(lx, ly);
-            ctx.strokeStyle = node.isSelf ? "rgba(255, 51, 102, 0.6)" : "rgba(0, 255, 204, 0.3)";
+            ctx.strokeStyle = node.isSelf ? node.color : "rgba(255, 255, 255, 0.2)";
             ctx.lineWidth = node.isSelf ? 3 : 2;
             ctx.stroke();
 
             // Draw Node
             ctx.beginPath();
-            ctx.arc(lx, ly, node.isSelf ? 15 : 10, 0, 2 * Math.PI);
-            ctx.fillStyle = node.isSelf ? "#ff3366" : "#00ffcc";
+            ctx.arc(lx, ly, node.isSelf ? 15 : 12, 0, 2 * Math.PI);
+            ctx.fillStyle = node.color;
             ctx.fill();
+
+            // Draw Name Label
+            ctx.fillStyle = "#fff";
+            ctx.font = "12px Courier";
+            const textWidth = ctx.measureText(node.name).width;
+            ctx.fillText(node.name, lx - (textWidth/2), ly - 20);
 
             // Draw Delta connections (Topology web)
             for (let j = i + 1; j < allNodes.length; j++) {
@@ -434,6 +611,36 @@
                 ctx.lineWidth = 1;
                 ctx.stroke();
             }
+        }
+
+        // Draw Synesthetic Ripples (Afterimages)
+        for (let i = ripples.length - 1; i >= 0; i--) {
+            const r = ripples[i];
+            r.radius += dt * 0.1;
+            r.alpha -= dt * 0.001;
+
+            if (r.alpha <= 0) {
+                ripples.splice(i, 1);
+                continue;
+            }
+
+            const rx = cx + Math.cos(r.phase) * radius;
+            const ry = cy + Math.sin(r.phase) * radius;
+
+            ctx.beginPath();
+            ctx.arc(rx, ry, r.radius, 0, 2 * Math.PI);
+            ctx.strokeStyle = r.color;
+            ctx.globalAlpha = r.alpha;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.globalAlpha = 1.0;
+        }
+
+        // Draw Global Big Bang Flash
+        if (window.bigBangFlash && window.bigBangFlash > 0) {
+            ctx.fillStyle = `rgba(255, 255, 255, ${window.bigBangFlash})`;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            window.bigBangFlash -= dt * 0.001;
         }
 
         requestAnimationFrame(draw);
