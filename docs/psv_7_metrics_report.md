@@ -5,11 +5,11 @@
 ## 2.1 시간축/통신망 가속도 계측 군 (Network & Time Layer)
 
 ### Metric 1: 하이퍼스피어 0ns 변화 감지율 (Holographic Tracking Latency)
-- **계측 결과:** 기본 관측 지연 31,477 ns, 돌연변이 변화 감지 지연 6,948 ns
+- **계측 결과:** 기본 관측 지연 16,373 ns, 돌연변이 변화 감지 지연 6,983 ns
 - **판정:** 데이터 체적을 $O(1)$로 동시 관측하여 나노초($ns$) 영역에서 궤적을 사출하는 데 성공했습니다. **[PASS]**
 
 ### Metric 2: 트래픽 폭증 저항력 (Spike Input Saturation Test)
-- **계측 결과:** 평시 OPS 311,261 $\rightarrow$ 100배 스파이크 시 유속 유지율 97.63%
+- **계측 결과:** 평시 OPS 304,417 $\rightarrow$ 100배 스파이크 시 유속 유지율 91.72%
 - **판정:** 임계치 돌파 시 스칼라에서 체적 텐서로 단위를 가변 스케일링하여 하드웨어 파열 없이 버텨냈습니다. **[PASS]**
 
 ### Metric 3: 삼중미러월드 자율 위상 복구율 (Phase Forward Error Correction Rate)
