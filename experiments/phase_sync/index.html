@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Decentralized P2P Spacetime Node</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #030303;
+            color: #00ffcc;
+            font-family: 'Courier New', Courier, monospace;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+        canvas {
+            display: block;
+        }
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            pointer-events: none;
+            background: rgba(0,0,0,0.8);
+            padding: 15px;
+            border-radius: 5px;
+            border: 1px solid #00ffcc;
+            z-index: 10;
+        }
+        .highlight { color: #fff; font-weight: bold; }
+        .self-id { color: #ff3366; }
+    </style>
+</head>
+<body>
+
+<div id="info">
+    <div style="margin-bottom: 10px; border-bottom: 1px dashed #00ffcc; padding-bottom: 10px;">
+        <div style="font-size: 0.9em; margin-bottom: 5px;">Persona (Avatar Setup):</div>
+        <div style="display: flex; gap: 5px; align-items: center;">
+            <input type="text" id="nickname-input" placeholder="Nickname..." value="Wanderer" style="padding: 5px; background: #111; color: #fff; border: 1px solid #fff; width: 80px;">
+            <input type="color" id="avatar-color" value="#ff3366" style="padding: 0; border: none; background: none; cursor: pointer; width: 30px; height: 30px;">
+        </div>
+    </div>
+
+    <div>Node ID: <span id="node-id" class="self-id">Booting...</span></div>
+    <div>Local Phase: <span id="local-phase">0.00</span></div>
+    <div style="margin-top: 5px;">Channel Gravity (N): <span id="mass" class="highlight">1</span> Nodes</div>
+
+    <div style="margin-top: 15px; border-bottom: 1px dashed #00ffcc; padding-bottom: 10px;">
+        <div style="font-size: 0.9em; margin-bottom: 5px;">Phase Multiverse Tuning:</div>
+        <div style="display: flex; gap: 5px;">
+            <input type="text" id="channel-input" placeholder="e.g. Jazz, News..." value="Global" style="padding: 5px; background: #111; color: #ff3366; border: 1px solid #ff3366; width: 100%;">
+            <button id="tune-btn" style="padding: 5px; background: #ff3366; color: #000; border: none; cursor: pointer; font-weight: bold;">Tune</button>
+        </div>
+        <div style="font-size: 0.8em; margin-top: 5px; color: #aaa;">Current Frequency: <span id="freq-display" style="color: #fff;">...</span> rad</div>
+    </div>
+
+    <div style="margin-top: 15px; border-bottom: 1px dashed #00ffcc; padding-bottom: 10px;">
+        <button id="dice-btn" style="padding: 10px; width: 100%; background: #ffcc00; color: #000; border: none; cursor: pointer; font-weight: bold; font-size: 1.1em; border-radius: 5px;">🎲 Roll Dice (Phase Pulse)</button>
+    </div>
+
+    <div style="margin-top: 10px; display: flex; flex-direction: column; gap: 5px;">
+        <input type="text" id="message-input" placeholder="Radiate to channel..." style="padding: 5px; background: #111; color: #00ffcc; border: 1px solid #00ffcc;">
+        <button id="send-btn" style="padding: 5px; background: #00ffcc; color: #000; border: none; cursor: pointer; font-weight: bold;">Radiate Data</button>
+    </div>
+
+    <div id="absolute-cmd-container" style="display: none; margin-top: 10px; border: 2px solid #ff00ff; padding: 10px; background: rgba(255,0,255,0.1);">
+        <div style="color: #ff00ff; font-weight: bold; font-size: 0.9em; margin-bottom: 5px;">👑 ABSOLUTE COMMAND AUTHORITY</div>
+        <input type="text" id="cmd-input" placeholder="Impose your will on the universe..." style="padding: 5px; background: #000; color: #ff00ff; border: 1px solid #ff00ff; width: 100%; box-sizing: border-box;">
+        <button id="cmd-btn" style="margin-top: 5px; width: 100%; padding: 5px; background: #ff00ff; color: #fff; border: none; cursor: pointer; font-weight: bold;">Execute Global Pulse</button>
+    </div>
+
+    <div id="received-messages" style="margin-top: 15px; max-height: 150px; overflow-y: auto; font-size: 0.9em; border-top: 1px dashed #00ffcc; padding-top: 5px;">
+        <div style="color: #555;">Resonant echoes will appear here...</div>
+    </div>
+</div>
+
+<canvas id="canvas"></canvas>
+
+<script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const nodeIdEl = document.getElementById('node-id');
+    const localPhaseEl = document.getElementById('local-phase');
+    const massEl = document.getElementById('mass');
+
+    // UI Elements for Persona
+    const nicknameInput = document.getElementById('nickname-input');
+    const avatarColorInput = document.getElementById('avatar-color');
+
+    // UI Elements for Channel Tuning
+    const channelInput = document.getElementById('channel-input');
+    const tuneBtn = document.getElementById('tune-btn');
+    const freqDisplay = document.getElementById('freq-display');
+
+    // UI Elements for Data-Phase resonance
+    const msgInput = document.getElementById('message-input');
+    const sendBtn = document.getElementById('send-btn');
+    const msgLog = document.getElementById('received-messages');
+    const diceBtn = document.getElementById('dice-btn');
+    const viewToggleBtn = document.createElement('button');
+    viewToggleBtn.innerText = "🌌 Switch to Galaxy Map";
+    viewToggleBtn.style.cssText = "padding: 5px; background: #222; color: #00ffcc; border: 1px solid #00ffcc; cursor: pointer; font-weight: bold; margin-top: 5px;";
+    msgInput.parentElement.appendChild(viewToggleBtn);
+
+    // --- Galaxy Map (Macro Universe) State ---
+    let isGalaxyView = false;
+    let universeState = {}; // channel_phase -> node_count
+
+    viewToggleBtn.addEventListener('click', () => {
+        isGalaxyView = !isGalaxyView;
+        viewToggleBtn.innerText = isGalaxyView ? "🔭 Switch to Local Star System" : "🌌 Switch to Galaxy Map";
+        if (isGalaxyView) {
+            msgLog.innerHTML = `<div style="color: #aaa;">Viewing macro-universe. Local spatial gossip suspended.</div>`;
+        } else {
+            msgLog.innerHTML = `<div style="color: #555;">Returned to local star system...</div>`;
+        }
+    });
+
+    // UI Elements for Absolute Tuner
+    const cmdContainer = document.getElementById('absolute-cmd-container');
+    const cmdInput = document.getElementById('cmd-input');
+    const cmdBtn = document.getElementById('cmd-btn');
+
+    // --- Phase Multiverse (Channel) Logic ---
+    let currentChannelPhase = 0.0;
+
+    // Simple hash to convert string to a persistent float between 0 and 2PI
+    function stringToPhaseFrequency(str) {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            let char = str.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash; // Convert to 32bit integer
+        }
+        // Normalize to 0 -> 2PI
+        let normalized = (Math.abs(hash) % 1000000) / 1000000;
+        return normalized * 2 * Math.PI;
+    }
+
+    function tuneChannel() {
+        const channelName = channelInput.value.trim() || "Global";
+        currentChannelPhase = stringToPhaseFrequency(channelName);
+        freqDisplay.innerText = currentChannelPhase.toFixed(4);
+
+        // Clear peer state when jumping to a new universe
+        peerPhases = {};
+        for(let id in peerTimeouts) clearTimeout(peerTimeouts[id]);
+        peerTimeouts = {};
+
+        msgLog.innerHTML = `<div style="color: #555;">Tuned to universe [${channelName}]...</div>`;
+    }
+
+    tuneBtn.addEventListener('click', tuneChannel);
+    channelInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') tuneBtn.click();
+    });
+
+    // Initial tune
+    tuneChannel();
+
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // Generate a unique ID for this local node
+    const myNodeId = "N_" + Math.random().toString(36).substr(2, 4).toUpperCase();
+    nodeIdEl.innerText = myNodeId;
+
+    let myNickname = nicknameInput.value;
+    let myAvatarColor = avatarColorInput.value;
+
+    nicknameInput.addEventListener('change', () => { myNickname = nicknameInput.value; });
+    avatarColorInput.addEventListener('change', () => { myAvatarColor = avatarColorInput.value; });
+
+    // --- Turing Translation Layer (Hardware-Data Alignment) ---
+    // Converts a string into an array of float Phase Angles (Theta)
+    function dataToPhases(text) {
+        const encoder = new TextEncoder();
+        const bytes = encoder.encode(text);
+        let phases = [];
+        for (let i = 0; i < bytes.length; i++) {
+            // linear mapping formula: theta = (byte / 255.0) * 2 * PI
+            let theta = (bytes[i] / 255.0) * (2 * Math.PI);
+            phases.push(theta);
+        }
+        return phases;
+    }
+
+    // Converts an array of Phase Angles (Theta) back into a string
+    function phasesToData(phases) {
+        let bytes = new Uint8Array(phases.length);
+        for (let i = 0; i < phases.length; i++) {
+            // inverse mapping: byte = (theta / (2 * PI)) * 255
+            let byte = Math.round((phases[i] / (2 * Math.PI)) * 255);
+            bytes[i] = byte;
+        }
+        const decoder = new TextDecoder();
+        return decoder.decode(bytes);
+    }
+
+    // --- Decentralized Physics Engine (Local Scope) ---
+    // This node ONLY controls itself.
+    let myPhase = Math.random() * Math.PI * 2; // Spawn at random phase
+    let myAxisSpeed = 0.01; // Base internal time drift
+
+    // The states of peers we hear via gossip
+    let peerPhases = {};
+    let peerMetadatas = {}; // Stores nickname and color
+    // We track timestamps to purge dead peers if they stop broadcasting
+    let peerTimeouts = {};
+
+    const REPULSION_K = 0.1;
+    const BASE_SPEED = 0.01;
+
+    function modulo(a, b) {
+        return ((a % b) + b) % b;
+    }
+
+    // Fixed timestep for physics calculations
+    const TARGET_FPS = 60;
+    const TARGET_FRAME_TIME = 1000 / TARGET_FPS;
+
+    function stepLocalPhysics(dt) {
+        let timeScale = dt / TARGET_FRAME_TIME;
+
+        let totalTension = 0.0;
+        let repulsionForce = 0.0;
+
+        // Count peers + self
+        const peerIds = Object.keys(peerPhases);
+        const N = peerIds.length + 1;
+
+        // 1. Calculate the forces acting upon ME from my peers
+        for (const peerId of peerIds) {
+            let p_peer = peerPhases[peerId];
+
+            // Shortest angular distance [-pi, pi]
+            let diff = modulo(myPhase - p_peer + Math.PI, 2 * Math.PI) - Math.PI;
+
+            let distance = Math.abs(diff);
+            if (distance < 0.001) distance = 0.001; // Avoid singularity
+
+            // Pure inverse repulsion
+            let magnitude = REPULSION_K / distance;
+            totalTension += magnitude;
+
+            let direction = diff > 0 ? 1 : -1;
+            repulsionForce += direction * magnitude;
+        }
+
+        // 2. Adjust local time axis based on tension (Energy dissipation)
+        myAxisSpeed = (BASE_SPEED / N) + (totalTension * 0.001 / N);
+
+        // 3. Move MY phase
+        myPhase = modulo(myPhase + (myAxisSpeed + (repulsionForce / N)) * timeScale, 2 * Math.PI);
+
+        // Update UI
+        localPhaseEl.innerText = myPhase.toFixed(2);
+        massEl.innerText = N;
+    }
+
+    // --- WebSocket (Relay Gossip) ---
+    const ws = new WebSocket(`ws://${window.location.hostname}:8765`);
+
+    ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+
+        if (data.type === "gossip") {
+            // A peer broadcasted their state
+            peerPhases[data.id] = data.phase;
+
+            // Reset timeout for this peer
+            if (peerTimeouts[data.id]) clearTimeout(peerTimeouts[data.id]);
+
+            // If we don't hear from a peer in 2 seconds, assume it died and purge it
+            peerTimeouts[data.id] = setTimeout(() => {
+                delete peerPhases[data.id];
+                delete peerTimeouts[data.id];
+            }, 2000);
+
+        } else if (data.type === "node_disconnected") {
+            // The relay hints someone dropped.
+            // We rely on our timeout above for exact culling, but this can speed it up if we wanted.
+            // For true decentralization, the timeout is the primary mechanism.
+        }
+    };
+
+    // --- Absolute Tuner Protocol Variables ---
+    let isChannelLocked = false;
+    let lockedUntil = 0;
+    let iAmAbsolute = false;
+
+    // --- Safe Text Node Helper to prevent XSS ---
+    function createSafeSpan(text, color, isBold=false, bgColor="transparent", padding="0px", display="inline") {
+        const span = document.createElement('span');
+        span.textContent = text;
+        span.style.color = color;
+        if (isBold) span.style.fontWeight = "bold";
+        span.style.background = bgColor;
+        span.style.padding = padding;
+        span.style.display = display;
+        return span;
+    }
+
+    // --- Resonance Reception (Data Unpacking & Dice Physics) ---
+    function handlePulse(senderId, rollValue, senderPersona) {
+        // Physical visual response
+        // Increase base speed temporarily to simulate a massive tension shockwave
+        myAxisSpeed += (rollValue * 0.05);
+
+        // Log it Safely
+        const msgDiv = document.createElement('div');
+        msgDiv.style.marginBottom = "5px";
+        msgDiv.appendChild(createSafeSpan(`[${senderPersona.name}]`, senderPersona.color));
+        msgDiv.appendChild(document.createTextNode(" rolled a "));
+        msgDiv.appendChild(createSafeSpan(`${rollValue}`, "#fff", true));
+        msgDiv.appendChild(document.createTextNode(" 🎲 (Phase Shockwave!)"));
+
+        if (msgLog.children.length > 0 && msgLog.children[0].innerText.includes("Resonant echoes")) {
+            msgLog.innerHTML = "";
+        }
+        msgLog.prepend(msgDiv);
+
+        // Visual ripple effect registration (to be drawn in render loop)
+        ripples.push({
+            phase: peerPhases[senderId] || myPhase,
+            radius: 15,
+            maxRadius: 100 + (rollValue * 20),
+            // Ensure color is a valid hex to prevent strange canvas injection errors though canvas handles it gracefully
+            color: senderPersona.color,
+            alpha: 1.0
+        });
+    }
+
+    let absoluteFlashColor = "#ffffff";
+    let globalCommandText = "";
+
+    function triggerGlobalBigBang(senderPersona, newBasePhase) {
+        // The Absolute Tuner Protocol (1-Hour Lock-down)
+        const msgDiv = document.createElement('div');
+        msgDiv.style.marginBottom = "5px";
+
+        const bbSpan = createSafeSpan(
+            `🌌 GLOBAL BIG BANG!\n지금 ${senderPersona.name}이(가) 주사위의 잔영을 통해 이 우주의 주파수를 조율 중입니다!`,
+            "#fff", true, senderPersona.color, "5px", "block"
+        );
+        bbSpan.style.marginTop = "10px";
+        msgDiv.appendChild(bbSpan);
+
+        msgLog.prepend(msgDiv);
+
+        // 1-Hour Lock
+        isChannelLocked = true;
+        lockedUntil = Date.now() + (60 * 60 * 1000);
+
+        // Check if I am the absolute
+        if (senderPersona.name === myNickname && senderPersona.color === myAvatarColor) {
+            iAmAbsolute = true;
+            cmdContainer.style.display = "block";
+        } else {
+            iAmAbsolute = false;
+            cmdContainer.style.display = "none";
+        }
+
+        // Force everyone to tune to the winner's frequency
+        currentChannelPhase = newBasePhase;
+        channelInput.value = "[LOCKED] by " + senderPersona.name;
+        channelInput.disabled = true;
+        tuneBtn.disabled = true;
+        freqDisplay.innerText = currentChannelPhase.toFixed(4) + " (ABSOLUTE)";
+
+        // Visual flash
+        window.bigBangFlash = 1.0;
+        absoluteFlashColor = senderPersona.color;
+
+        // Clear old peers that don't belong in this new forced reality
+        peerPhases = {};
+        for(let id in peerTimeouts) clearTimeout(peerTimeouts[id]);
+        peerTimeouts = {};
+    }
+
+    function handleHolographicBurst(senderId, phaseBurst) {
+        try {
+            // Reconstruct the original data from the phase angles
+            const reconstructedText = phasesToData(phaseBurst);
+
+            // Display it in the log safely to prevent XSS
+            const msgDiv = document.createElement('div');
+            msgDiv.style.marginBottom = "5px";
+
+            const senderSpan = document.createElement('span');
+            senderSpan.style.color = "#ff3366";
+            senderSpan.textContent = `[${senderId}]`;
+
+            const textSpan = document.createElement('span');
+            textSpan.style.color = "#fff";
+            textSpan.textContent = reconstructedText;
+
+            msgDiv.appendChild(senderSpan);
+            msgDiv.appendChild(document.createTextNode(" resonated: "));
+            msgDiv.appendChild(textSpan);
+
+            // Remove placeholder if present
+            if (msgLog.children.length > 0 && msgLog.children[0].innerText.includes("Resonant echoes")) {
+                msgLog.innerHTML = "";
+            }
+
+            msgLog.prepend(msgDiv);
+        } catch (e) {
+            console.error("Failed to reconstruct phase burst", e);
+        }
+    }
+
+    ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+
+        // Macro Universe Tracking
+        if (data.type === "universe_pulse") {
+            universeState = data.galaxies;
+
+            // Orbital Mechanics (Macro Phase Logic)
+            // If we are NOT the Absolute Tuner, our channel's frequency is slowly pulled
+            // by the gravity of the largest massive star (channel) nearby.
+            if (!iAmAbsolute && !isChannelLocked) {
+                let maxMass = 0;
+                let targetPullPhase = currentChannelPhase;
+
+                for (let chStr in universeState) {
+                    let chPhase = parseFloat(chStr);
+                    let mass = universeState[chStr];
+
+                    if (mass > maxMass) {
+                        // Only feel gravity from adjacent universes (within PI/4 rads) to form "Alliances"
+                        let diff = modulo(chPhase - currentChannelPhase + Math.PI, 2 * Math.PI) - Math.PI;
+                        if (Math.abs(diff) < Math.PI / 4 && mass > 1) { // Ignore solo wanderers
+                            maxMass = mass;
+                            targetPullPhase = chPhase;
+                        }
+                    }
+                }
+
+                // Slowly drift towards the massive alliance
+                if (targetPullPhase !== currentChannelPhase) {
+                    let diff = modulo(targetPullPhase - currentChannelPhase + Math.PI, 2 * Math.PI) - Math.PI;
+                    currentChannelPhase = modulo(currentChannelPhase + (diff * 0.05), 2 * Math.PI); // 5% drift per pulse
+                    freqDisplay.innerText = currentChannelPhase.toFixed(4) + " (Drifting)";
+                }
+            }
+            return;
+        }
+
+        // The Global Big Bang overrides all filters
+        if (data.type === "global_big_bang") {
+            triggerGlobalBigBang(data.persona, data.new_channel);
+            return;
+        } else if (data.type === "global_command") {
+            // Absolute Tuner Global Pulse Message
+            absoluteFlashColor = data.persona.color;
+            window.bigBangFlash = 0.8;
+            globalCommandText = data.message;
+            myAxisSpeed += 1.5; // Tempo surge
+
+            const msgDiv = document.createElement('div');
+            msgDiv.style.marginBottom = "5px";
+
+            msgDiv.appendChild(createSafeSpan(`[ABSOLUTE COMMAND] ${data.persona.name}:`, "#fff", true, data.persona.color, "3px"));
+            msgDiv.appendChild(document.createTextNode(" "));
+
+            const msgSpan = createSafeSpan(data.message, data.persona.color, true);
+            msgSpan.style.fontSize = "1.1em";
+            msgDiv.appendChild(msgSpan);
+
+            msgLog.prepend(msgDiv);
+
+            // Add a massive central ripple
+            ripples.push({
+                phase: currentChannelPhase,
+                radius: 10,
+                maxRadius: canvas.width * 0.8,
+                color: data.persona.color,
+                alpha: 1.0,
+                isGlobal: true
+            });
+            return;
+        }
+
+        // Resonance Filter (Centrifugal Security)
+        if (data.channel !== undefined && Math.abs(data.channel - currentChannelPhase) > 0.001) {
+            return; // Ignore signals from parallel universes
+        }
+
+        if (data.type === "gossip") {
+            // A peer broadcasted their spatial state
+            peerPhases[data.id] = data.phase;
+            if (data.persona) {
+                peerMetadatas[data.id] = data.persona;
+            }
+
+            // Reset timeout for this peer
+            if (peerTimeouts[data.id]) clearTimeout(peerTimeouts[data.id]);
+
+            // If we don't hear from a peer in 2 seconds, assume it died and purge it
+            peerTimeouts[data.id] = setTimeout(() => {
+                delete peerPhases[data.id];
+                delete peerMetadatas[data.id];
+                delete peerTimeouts[data.id];
+            }, 2000);
+
+        } else if (data.type === "node_disconnected") {
+            // Handled by timeout above
+        } else if (data.type === "holographic_burst") {
+            // A peer transmitted a file/message as phase angles!
+            handleHolographicBurst(data.id, data.phases);
+        } else if (data.type === "dice_pulse") {
+            handlePulse(data.id, data.roll, data.persona);
+        }
+    };
+
+    // Periodically broadcast our spatial state to the network
+    setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+                type: "gossip",
+                id: myNodeId,
+                phase: myPhase,
+                channel: currentChannelPhase,
+                persona: {
+                    name: myNickname,
+                    color: myAvatarColor
+                }
+            }));
+        }
+    }, 50); // Broadcast state every 50ms (20Hz)
+
+    // --- Radiate Phase Field (Data Transmission) ---
+    sendBtn.addEventListener('click', () => {
+        const text = msgInput.value.trim();
+        if (!text) return;
+
+        // 1. Translate string into Phase Angles
+        const phaseBurst = dataToPhases(text);
+
+        // 2. Radiate the phase burst into the field
+        if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+                type: "holographic_burst",
+                id: myNodeId,
+                phases: phaseBurst,
+                channel: currentChannelPhase
+            }));
+
+            // Show locally safely
+            const msgDiv = document.createElement('div');
+            msgDiv.style.marginBottom = "5px";
+
+            const senderSpan = document.createElement('span');
+            senderSpan.style.color = "#00ffcc";
+            senderSpan.textContent = `[ME]`;
+
+            const textSpan = document.createElement('span');
+            textSpan.style.color = "#fff";
+            textSpan.textContent = text;
+
+            msgDiv.appendChild(senderSpan);
+            msgDiv.appendChild(document.createTextNode(" radiated: "));
+            msgDiv.appendChild(textSpan);
+
+            if (msgLog.children.length > 0 && msgLog.children[0].innerText.includes("Resonant echoes")) {
+                msgLog.innerHTML = "";
+            }
+            msgLog.prepend(msgDiv);
+
+            msgInput.value = "";
+        }
+    });
+
+    // Also send on Enter key
+    msgInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') sendBtn.click();
+    });
+
+    // Check if Absolute Lock has expired
+    setInterval(() => {
+        if (isChannelLocked && Date.now() > lockedUntil) {
+            isChannelLocked = false;
+            iAmAbsolute = false;
+            cmdContainer.style.display = "none";
+
+            channelInput.disabled = false;
+            tuneBtn.disabled = false;
+            channelInput.value = "Global";
+            tuneBtn.click();
+
+            const msgDiv = document.createElement('div');
+            msgDiv.style.marginBottom = "5px";
+            msgDiv.innerHTML = `<span style="color: #aaa;">[SYSTEM] The Absolute Lock has dissipated. Spacetime returns to normal.</span>`;
+            msgLog.prepend(msgDiv);
+        }
+    }, 10000);
+
+    // --- Absolute Tuner Execution ---
+    cmdBtn.addEventListener('click', () => {
+        if (!iAmAbsolute) return;
+        const text = cmdInput.value.trim();
+        if (!text) return;
+
+        if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+                type: "global_command",
+                message: text,
+                persona: {
+                    name: myNickname,
+                    color: myAvatarColor
+                }
+            }));
+            cmdInput.value = "";
+        }
+    });
+
+    cmdInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') cmdBtn.click();
+    });
+
+    // --- Dice Pulse (Physical Rhythm) ---
+    diceBtn.addEventListener('click', () => {
+        // Roll 6 dice simultaneously
+        let sum = 0;
+        let isAllSixes = true;
+
+        for(let i=0; i<6; i++) {
+            let roll = Math.floor(Math.random() * 6) + 1;
+            sum += roll;
+            if (roll !== 6) isAllSixes = false;
+        }
+
+        // For testing/demonstration purposes, we'll give a 1 in 10 chance of hitting it
+        // since true 1/46656 is too rare for a prototype evaluation.
+        // Uncomment the next line to use true probability:
+        // const hitBigBang = isAllSixes;
+        const hitBigBang = Math.random() < 0.1;
+
+        // Radiate pulse
+        if (ws.readyState === WebSocket.OPEN) {
+            if (hitBigBang) {
+                // The Absolute Tuner Bypass
+                // Winner establishes a new Absolute Base Phase based on their identity
+                const absolutePhase = stringToPhaseFrequency("ABSOLUTE_" + myNodeId + Date.now());
+
+                ws.send(JSON.stringify({
+                    type: "global_big_bang",
+                    id: myNodeId,
+                    new_channel: absolutePhase,
+                    persona: {
+                        name: myNickname,
+                        color: myAvatarColor
+                    }
+                }));
+
+                triggerGlobalBigBang({name: "ME", color: myAvatarColor}, absolutePhase);
+            } else {
+                ws.send(JSON.stringify({
+                    type: "dice_pulse",
+                    id: myNodeId,
+                    roll: sum,
+                    channel: currentChannelPhase,
+                    persona: {
+                        name: myNickname,
+                        color: myAvatarColor
+                    }
+                }));
+                // Apply locally
+                handlePulse(myNodeId, sum, {name: "ME", color: myAvatarColor});
+            }
+        } else {
+             // Apply locally if offline
+             handlePulse(myNodeId, sum, {name: "ME", color: myAvatarColor});
+        }
+    });
+
+    let ripples = [];
+
+
+    // --- Render Loop ---
+    let lastTime = 0;
+
+    function draw(timestamp) {
+        if (!lastTime) lastTime = timestamp;
+        let dt = timestamp - lastTime;
+        if (dt > 100) dt = TARGET_FRAME_TIME; // Prevent massive jumps on tab resume
+        lastTime = timestamp;
+
+        stepLocalPhysics(dt);
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        const cx = canvas.width / 2;
+        const cy = canvas.height / 2;
+        const radius = Math.min(canvas.width, canvas.height) * 0.35;
+
+        // Draw Spacetime Orbit Path
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, 0, 2 * Math.PI);
+        ctx.strokeStyle = "rgba(0, 255, 204, 0.1)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Draw Center Anchor
+        const peerIds = Object.keys(peerPhases);
+        ctx.beginPath();
+        ctx.arc(cx, cy, 5 + (peerIds.length + 1), 0, 2 * Math.PI);
+        ctx.fillStyle = "#00ffcc";
+        ctx.fill();
+
+        // Combine all phases to draw the full topology
+        const allNodes = [
+            { id: myNodeId, phase: myPhase, isSelf: true, name: myNickname, color: myAvatarColor },
+            ...peerIds.map(id => {
+                const meta = peerMetadatas[id] || { name: id, color: "#00ffcc" };
+                return { id: id, phase: peerPhases[id], isSelf: false, name: meta.name, color: meta.color };
+            })
+        ];
+
+        for (let i = 0; i < allNodes.length; i++) {
+            const node = allNodes[i];
+            const lx = cx + Math.cos(node.phase) * radius;
+            const ly = cy + Math.sin(node.phase) * radius;
+
+            // Draw Wye connection (Node to Center)
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(lx, ly);
+            ctx.strokeStyle = node.isSelf ? node.color : "rgba(255, 255, 255, 0.2)";
+            ctx.lineWidth = node.isSelf ? 3 : 2;
+            ctx.stroke();
+
+            // Draw Node
+            ctx.beginPath();
+            ctx.arc(lx, ly, node.isSelf ? 15 : 12, 0, 2 * Math.PI);
+            ctx.fillStyle = node.color;
+            ctx.fill();
+
+            // Draw Name Label
+            ctx.fillStyle = "#fff";
+            ctx.font = "12px Courier";
+            const textWidth = ctx.measureText(node.name).width;
+            ctx.fillText(node.name, lx - (textWidth/2), ly - 20);
+
+            // Draw Delta connections (Topology web)
+            for (let j = i + 1; j < allNodes.length; j++) {
+                const other = allNodes[j];
+                const ox = cx + Math.cos(other.phase) * radius;
+                const oy = cy + Math.sin(other.phase) * radius;
+
+                ctx.beginPath();
+                ctx.moveTo(lx, ly);
+                ctx.lineTo(ox, oy);
+                ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+        }
+
+        // Draw Synesthetic Ripples (Afterimages)
+        for (let i = ripples.length - 1; i >= 0; i--) {
+            const r = ripples[i];
+            r.radius += r.isGlobal ? dt * 0.3 : dt * 0.1;
+            r.alpha -= dt * 0.001;
+
+            if (r.alpha <= 0) {
+                ripples.splice(i, 1);
+                continue;
+            }
+
+            // Global ripples emanate from center
+            const rx = r.isGlobal ? cx : cx + Math.cos(r.phase) * radius;
+            const ry = r.isGlobal ? cy : cy + Math.sin(r.phase) * radius;
+
+            ctx.beginPath();
+            ctx.arc(rx, ry, r.radius, 0, 2 * Math.PI);
+            ctx.strokeStyle = r.color;
+            ctx.globalAlpha = r.alpha;
+            ctx.lineWidth = r.isGlobal ? 5 : 2;
+            ctx.stroke();
+            ctx.globalAlpha = 1.0;
+        }
+
+        // Draw Global Big Bang Flash & Permanent Afterimage
+        if (window.bigBangFlash && window.bigBangFlash > 0) {
+            // Convert hex to rgb to apply alpha
+            let hex = absoluteFlashColor.replace('#', '');
+            let r_col = parseInt(hex.substring(0,2), 16);
+            let g_col = parseInt(hex.substring(2,4), 16);
+            let b_col = parseInt(hex.substring(4,6), 16);
+            ctx.fillStyle = `rgba(${r_col}, ${g_col}, ${b_col}, ${window.bigBangFlash})`;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            window.bigBangFlash -= dt * 0.001;
+
+            if (globalCommandText && window.bigBangFlash > 0.2) {
+                ctx.fillStyle = "#fff";
+                ctx.font = "bold 30px Courier";
+                ctx.textAlign = "center";
+                ctx.fillText(globalCommandText, cx, cy);
+                ctx.textAlign = "left"; // reset
+            }
+        }
+
+        // --- Galaxy Map Override ---
+        if (isGalaxyView) {
+            // Overdraw the screen for deep space
+            ctx.fillStyle = "rgba(0, 0, 0, 0.9)";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Galaxy Grid
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius, 0, 2 * Math.PI);
+            ctx.strokeStyle = "rgba(0, 255, 204, 0.05)";
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            // Render Channels as Stars
+            for (let chStr in universeState) {
+                let chPhase = parseFloat(chStr);
+                let mass = universeState[chStr];
+
+                let sx = cx + Math.cos(chPhase) * radius;
+                let sy = cy + Math.sin(chPhase) * radius;
+
+                // Star size based on mass
+                let starRadius = 5 + (mass * 2);
+
+                // Glow
+                let gradient = ctx.createRadialGradient(sx, sy, 0, sx, sy, starRadius * 2);
+                gradient.addColorStop(0, "rgba(255, 255, 255, 1)");
+                gradient.addColorStop(0.2, "rgba(0, 255, 204, 0.8)");
+                gradient.addColorStop(1, "rgba(0, 255, 204, 0)");
+
+                ctx.beginPath();
+                ctx.arc(sx, sy, starRadius * 2, 0, 2 * Math.PI);
+                ctx.fillStyle = gradient;
+                ctx.fill();
+
+                // If it's my channel, highlight it
+                if (Math.abs(chPhase - currentChannelPhase) < 0.001) {
+                    ctx.beginPath();
+                    ctx.arc(sx, sy, starRadius * 2.5, 0, 2 * Math.PI);
+                    ctx.strokeStyle = "#ff3366";
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([5, 5]);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+
+                    ctx.fillStyle = "#ff3366";
+                    ctx.font = "12px Courier";
+                    ctx.fillText("You are here", sx + 15, sy - 15);
+                }
+            }
+        }
+
+        requestAnimationFrame(draw);
+    }
+
+    // Start loop
+    requestAnimationFrame(draw);
+
+</script>
+</body>
+</html>
