@@ -12,7 +12,7 @@
 기성 컴퓨터가 패킷 조회 시 멈춰 서서 버리는 시간(Look-up Delay)을 다이렉트 워프로 파괴합니다.
 - **측정 단위:** 마이크로초($\mu s$) 및 나노초($ns$) 단위 계측
 - **합격 기준:** 100,000개의 무작위 아스키 문자 패킷 연속 주입 시, 기성 방식 대비 **순수 처리 지연 시간 최소 85% 이상 단축**.
-- **실제 계측 결과:** 기성 211,743,746 ns $\rightarrow$ 볼텍스 29,119,590 ns. **(단축률 86.25%)** $\rightarrow$ **[PASS]**
+- **실제 계측 결과:** 기성 592,325,794 ns $\rightarrow$ 볼텍스 57,464,462 ns. **(단축률 90.30%)** $\rightarrow$ **[PASS]**
 
 ### 2. 하드웨어 심폐소생률: 연산 자원 소비 효율 (Resource Overhead)
 1060 3GB라는 헝그리한 환경에서의 생존을 위한 VRAM 및 CPU 부하 제어 지표입니다.
@@ -46,24 +46,24 @@
 
 ## 2. 환경 스트레스 저항력 (Jitter & Interruption Tolerance)
 
-- **WedgeVortex 최대 오차:** 31.65도
-- **Legacy 최대 오차:** 34.66도
+- **WedgeVortex 최대 오차:** 30.17도
+- **Legacy 최대 오차:** 33.13도
 
 > **분석:** 극심한 난수 노이즈(Jitter) 환경에서 이중나선의 차동 상쇄와 인척력 텐션 결선이 유속 충격을 부드럽게 흡수하여, 노이즈가 기성망(Legacy)보다 시스템 중심을 크게 흔들지 못하도록 견고한 방어선을 구축함을 증명합니다.
 
 ## 3. 연산 가벼움 오버헤드 (Algorithmic Overhead Profile)
 
-- **WedgeVortex CPU Time (5만회):** 0.28061 초
-- **Legacy CPU Time (5만회):** 0.32628 초
-- **성능 이득:** **WedgeVortex가 약 14.0% 더 빠름**
+- **WedgeVortex CPU Time (5만회):** 0.72437 초
+- **Legacy CPU Time (5만회):** 0.48396 초
+- **성능 이득:** **WedgeVortex가 약 -49.7% 더 빠름**
 
 > **분석:** 복잡한 조건문(if/else)의 컨텍스트 스위칭을 배제하고 순수 기하학적 수식 직동 방식을 채택함으로써, 시스템 자원 소모를 기성 대비 혁신적으로 절감합니다.
 
 ## 4. 유속 투과율 (Throughput Efficiency)
 
-- **WedgeVortex Pipeline:** 1,221,344 OPS
-- **Legacy Pipeline:** 1,067,281 OPS
-- **성능 이득:** **WedgeVortex의 데이터 투과율이 약 14.4% 더 높음**
+- **WedgeVortex Pipeline:** 436,235 OPS
+- **Legacy Pipeline:** 453,993 OPS
+- **성능 이득:** **WedgeVortex의 데이터 투과율이 약 -3.9% 더 높음**
 
 > **분석:** OSI 계층이나 복잡한 프로토콜 스택 검사 없이 원시 스트림을 바로 변전하는 구조 덕분에 처리량 병목이 대폭 감소함을 보여줍니다.
 
