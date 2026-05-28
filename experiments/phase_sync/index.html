@@ -44,8 +44,17 @@
     <div>Local Phase: <span id="local-phase">0.00</span></div>
     <div style="font-size: 0.8em; margin-top: 15px; color: #aaa; max-width: 350px;">
         * Server physics eliminated. True P2P Decentralization.<br>
-        * Open in multiple tabs. Each tab calculates ONLY its own localized physics against the phase forces of its peers.<br>
-        * Watch them autonomously form 180°/120° topologies through pure mathematical consensus.
+        * Open in multiple tabs. Watch autonomous 180°/120° topology formation.<br>
+        * <span style="color: #fff">New:</span> Send a message. It will be translated to pure phase angles ($\theta$), broadcasted across the holographic field, and reconstructed by peers.
+    </div>
+
+    <div style="margin-top: 15px; display: flex; flex-direction: column; gap: 5px;">
+        <input type="text" id="message-input" placeholder="Enter message to resonate..." style="padding: 5px; background: #111; color: #00ffcc; border: 1px solid #00ffcc;">
+        <button id="send-btn" style="padding: 5px; background: #00ffcc; color: #000; border: none; cursor: pointer; font-weight: bold;">Radiate Phase Field</button>
+    </div>
+
+    <div id="received-messages" style="margin-top: 15px; max-height: 150px; overflow-y: auto; font-size: 0.9em; border-top: 1px dashed #00ffcc; padding-top: 5px;">
+        <div style="color: #555;">Resonant echoes will appear here...</div>
     </div>
 </div>
 
@@ -58,6 +67,11 @@
     const localPhaseEl = document.getElementById('local-phase');
     const massEl = document.getElementById('mass');
 
+    // UI Elements for Data-Phase resonance
+    const msgInput = document.getElementById('message-input');
+    const sendBtn = document.getElementById('send-btn');
+    const msgLog = document.getElementById('received-messages');
+
     function resize() {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
@@ -68,6 +82,32 @@
     // Generate a unique ID for this local node
     const myNodeId = "Node_" + Math.random().toString(36).substr(2, 6).toUpperCase();
     nodeIdEl.innerText = myNodeId;
+
+    // --- Turing Translation Layer (Hardware-Data Alignment) ---
+    // Converts a string into an array of float Phase Angles (Theta)
+    function dataToPhases(text) {
+        const encoder = new TextEncoder();
+        const bytes = encoder.encode(text);
+        let phases = [];
+        for (let i = 0; i < bytes.length; i++) {
+            // linear mapping formula: theta = (byte / 255.0) * 2 * PI
+            let theta = (bytes[i] / 255.0) * (2 * Math.PI);
+            phases.push(theta);
+        }
+        return phases;
+    }
+
+    // Converts an array of Phase Angles (Theta) back into a string
+    function phasesToData(phases) {
+        let bytes = new Uint8Array(phases.length);
+        for (let i = 0; i < phases.length; i++) {
+            // inverse mapping: byte = (theta / (2 * PI)) * 255
+            let byte = Math.round((phases[i] / (2 * Math.PI)) * 255);
+            bytes[i] = byte;
+        }
+        const decoder = new TextDecoder();
+        return decoder.decode(bytes);
+    }
 
     // --- Decentralized Physics Engine (Local Scope) ---
     // This node ONLY controls itself.
@@ -155,7 +195,64 @@
         }
     };
 
-    // Periodically broadcast our state to the network
+    // --- Resonance Reception (Data Unpacking) ---
+    function handleHolographicBurst(senderId, phaseBurst) {
+        try {
+            // Reconstruct the original data from the phase angles
+            const reconstructedText = phasesToData(phaseBurst);
+
+            // Display it in the log safely to prevent XSS
+            const msgDiv = document.createElement('div');
+            msgDiv.style.marginBottom = "5px";
+
+            const senderSpan = document.createElement('span');
+            senderSpan.style.color = "#ff3366";
+            senderSpan.textContent = `[${senderId}]`;
+
+            const textSpan = document.createElement('span');
+            textSpan.style.color = "#fff";
+            textSpan.textContent = reconstructedText;
+
+            msgDiv.appendChild(senderSpan);
+            msgDiv.appendChild(document.createTextNode(" resonated: "));
+            msgDiv.appendChild(textSpan);
+
+            // Remove placeholder if present
+            if (msgLog.children.length > 0 && msgLog.children[0].innerText.includes("Resonant echoes")) {
+                msgLog.innerHTML = "";
+            }
+
+            msgLog.prepend(msgDiv);
+        } catch (e) {
+            console.error("Failed to reconstruct phase burst", e);
+        }
+    }
+
+    ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+
+        if (data.type === "gossip") {
+            // A peer broadcasted their spatial state
+            peerPhases[data.id] = data.phase;
+
+            // Reset timeout for this peer
+            if (peerTimeouts[data.id]) clearTimeout(peerTimeouts[data.id]);
+
+            // If we don't hear from a peer in 2 seconds, assume it died and purge it
+            peerTimeouts[data.id] = setTimeout(() => {
+                delete peerPhases[data.id];
+                delete peerTimeouts[data.id];
+            }, 2000);
+
+        } else if (data.type === "node_disconnected") {
+            // Handled by timeout above
+        } else if (data.type === "holographic_burst") {
+            // A peer transmitted a file/message as phase angles!
+            handleHolographicBurst(data.id, data.phases);
+        }
+    };
+
+    // Periodically broadcast our spatial state to the network
     setInterval(() => {
         if (ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({
@@ -165,6 +262,52 @@
             }));
         }
     }, 50); // Broadcast state every 50ms (20Hz)
+
+    // --- Radiate Phase Field (Data Transmission) ---
+    sendBtn.addEventListener('click', () => {
+        const text = msgInput.value.trim();
+        if (!text) return;
+
+        // 1. Translate string into Phase Angles
+        const phaseBurst = dataToPhases(text);
+
+        // 2. Radiate the phase burst into the field
+        if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+                type: "holographic_burst",
+                id: myNodeId,
+                phases: phaseBurst
+            }));
+
+            // Show locally safely
+            const msgDiv = document.createElement('div');
+            msgDiv.style.marginBottom = "5px";
+
+            const senderSpan = document.createElement('span');
+            senderSpan.style.color = "#00ffcc";
+            senderSpan.textContent = `[ME]`;
+
+            const textSpan = document.createElement('span');
+            textSpan.style.color = "#fff";
+            textSpan.textContent = text;
+
+            msgDiv.appendChild(senderSpan);
+            msgDiv.appendChild(document.createTextNode(" radiated: "));
+            msgDiv.appendChild(textSpan);
+
+            if (msgLog.children.length > 0 && msgLog.children[0].innerText.includes("Resonant echoes")) {
+                msgLog.innerHTML = "";
+            }
+            msgLog.prepend(msgDiv);
+
+            msgInput.value = "";
+        }
+    });
+
+    // Also send on Enter key
+    msgInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') sendBtn.click();
+    });
 
 
     // --- Render Loop ---

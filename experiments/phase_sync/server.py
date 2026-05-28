@@ -39,9 +39,12 @@ async def handler(websocket):
 
 def start_http_server():
     web_dir = os.path.dirname(os.path.abspath(__file__))
-    os.chdir(web_dir)
-    Handler = http.server.SimpleHTTPRequestHandler
-    with socketserver.TCPServer(("", HTTP_PORT), Handler) as httpd:
+    # Create handler that explicitly serves from the given directory
+    class CustomHandler(http.server.SimpleHTTPRequestHandler):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, directory=web_dir, **kwargs)
+
+    with socketserver.TCPServer(("", HTTP_PORT), CustomHandler) as httpd:
         print(f"Observatory UI at http://{WS_HOST}:{HTTP_PORT}")
         httpd.serve_forever()
 
