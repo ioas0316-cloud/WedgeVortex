@@ -40,17 +40,21 @@
 
 <div id="info">
     <div>Node Identity: <span id="node-id" class="self-id">Booting...</span></div>
-    <div>Network Mass (N): <span id="mass" class="highlight">1</span> (Including Self)</div>
     <div>Local Phase: <span id="local-phase">0.00</span></div>
-    <div style="font-size: 0.8em; margin-top: 15px; color: #aaa; max-width: 350px;">
-        * Server physics eliminated. True P2P Decentralization.<br>
-        * Open in multiple tabs. Watch autonomous 180°/120° topology formation.<br>
-        * <span style="color: #fff">New:</span> Send a message. It will be translated to pure phase angles ($\theta$), broadcasted across the holographic field, and reconstructed by peers.
+    <div style="margin-top: 10px;">Channel Gravity (N): <span id="mass" class="highlight">1</span> Nodes</div>
+
+    <div style="margin-top: 15px; border-bottom: 1px dashed #00ffcc; padding-bottom: 10px;">
+        <div style="font-size: 0.9em; margin-bottom: 5px;">Phase Multiverse Tuning:</div>
+        <div style="display: flex; gap: 5px;">
+            <input type="text" id="channel-input" placeholder="e.g. Jazz, News..." value="Global" style="padding: 5px; background: #111; color: #ff3366; border: 1px solid #ff3366; width: 100%;">
+            <button id="tune-btn" style="padding: 5px; background: #ff3366; color: #000; border: none; cursor: pointer; font-weight: bold;">Tune</button>
+        </div>
+        <div style="font-size: 0.8em; margin-top: 5px; color: #aaa;">Current Frequency: <span id="freq-display" style="color: #fff;">...</span> rad</div>
     </div>
 
     <div style="margin-top: 15px; display: flex; flex-direction: column; gap: 5px;">
-        <input type="text" id="message-input" placeholder="Enter message to resonate..." style="padding: 5px; background: #111; color: #00ffcc; border: 1px solid #00ffcc;">
-        <button id="send-btn" style="padding: 5px; background: #00ffcc; color: #000; border: none; cursor: pointer; font-weight: bold;">Radiate Phase Field</button>
+        <input type="text" id="message-input" placeholder="Radiate to channel..." style="padding: 5px; background: #111; color: #00ffcc; border: 1px solid #00ffcc;">
+        <button id="send-btn" style="padding: 5px; background: #00ffcc; color: #000; border: none; cursor: pointer; font-weight: bold;">Radiate Data</button>
     </div>
 
     <div id="received-messages" style="margin-top: 15px; max-height: 150px; overflow-y: auto; font-size: 0.9em; border-top: 1px dashed #00ffcc; padding-top: 5px;">
@@ -67,10 +71,52 @@
     const localPhaseEl = document.getElementById('local-phase');
     const massEl = document.getElementById('mass');
 
+    // UI Elements for Channel Tuning
+    const channelInput = document.getElementById('channel-input');
+    const tuneBtn = document.getElementById('tune-btn');
+    const freqDisplay = document.getElementById('freq-display');
+
     // UI Elements for Data-Phase resonance
     const msgInput = document.getElementById('message-input');
     const sendBtn = document.getElementById('send-btn');
     const msgLog = document.getElementById('received-messages');
+
+    // --- Phase Multiverse (Channel) Logic ---
+    let currentChannelPhase = 0.0;
+
+    // Simple hash to convert string to a persistent float between 0 and 2PI
+    function stringToPhaseFrequency(str) {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            let char = str.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash; // Convert to 32bit integer
+        }
+        // Normalize to 0 -> 2PI
+        let normalized = (Math.abs(hash) % 1000000) / 1000000;
+        return normalized * 2 * Math.PI;
+    }
+
+    function tuneChannel() {
+        const channelName = channelInput.value.trim() || "Global";
+        currentChannelPhase = stringToPhaseFrequency(channelName);
+        freqDisplay.innerText = currentChannelPhase.toFixed(4);
+
+        // Clear peer state when jumping to a new universe
+        peerPhases = {};
+        for(let id in peerTimeouts) clearTimeout(peerTimeouts[id]);
+        peerTimeouts = {};
+
+        msgLog.innerHTML = `<div style="color: #555;">Tuned to universe [${channelName}]...</div>`;
+    }
+
+    tuneBtn.addEventListener('click', tuneChannel);
+    channelInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') tuneBtn.click();
+    });
+
+    // Initial tune
+    tuneChannel();
 
     function resize() {
         canvas.width = window.innerWidth;
@@ -231,6 +277,11 @@
     ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
 
+        // Resonance Filter (Centrifugal Security)
+        if (data.channel !== undefined && Math.abs(data.channel - currentChannelPhase) > 0.001) {
+            return; // Ignore signals from parallel universes
+        }
+
         if (data.type === "gossip") {
             // A peer broadcasted their spatial state
             peerPhases[data.id] = data.phase;
@@ -258,7 +309,8 @@
             ws.send(JSON.stringify({
                 type: "gossip",
                 id: myNodeId,
-                phase: myPhase
+                phase: myPhase,
+                channel: currentChannelPhase
             }));
         }
     }, 50); // Broadcast state every 50ms (20Hz)
@@ -276,7 +328,8 @@
             ws.send(JSON.stringify({
                 type: "holographic_burst",
                 id: myNodeId,
-                phases: phaseBurst
+                phases: phaseBurst,
+                channel: currentChannelPhase
             }));
 
             // Show locally safely
