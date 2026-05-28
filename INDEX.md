@@ -12,6 +12,7 @@
 * [WedgeVortex 아키텍처 벤치마크 평가 성적표](docs/4_communication_gear/BENCHMARK_REPORT.md)
 * [Wedge-Vortex 코어 프로토콜 아키텍처 명세서](docs/4_communication_gear/WEDGE_VORTEX_PROTOCOL_SPEC.md)
 * [Wedge-Vortex 현실적 한계 분석 및 하이브리드 로드맵](docs/4_communication_gear/ROADMAP_AND_LIMITATIONS.md)
+* [WedgeVortex 7대 절대 벤치마크 하드코어 계측 리포트](docs/psv_7_metrics_report.md)
 
 ### [추가 철학] 인과율 구조 맵을 통한 제로 타임 자율 복원
 기성 통신망이 재전송(ACK/NACK)과 외부 시간에 의존하여 렉(지연)을 발생시키는 것과 달리, Wedge-Vortex 하이브리드 수문 코어(PhaseInverterGate)는 패킷 앞뒤에 "과거-현재-미래"의 인과율 구조 지도를 동반합니다.
